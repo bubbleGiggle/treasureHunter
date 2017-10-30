@@ -1,0 +1,232 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml">
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
+<title>game</title>
+<script src="../pixi.js"></script>
+</head>
+
+<body>
+<script type="text/javascript">
+    var renderer=PIXI.autoDetectRenderer(512, 512,{antialias: false, transparent: false, resolution: 1});
+    document.body.appendChild(renderer.view);
+    var stage=new PIXI.Container();
+    var gameScene,gameOverScene;
+    var id,dungeon,explorer,door,treasure;
+    var blobNum=5,blobs=[];
+    var lifeValueMessage,message;
+    var lifeValue=100,getTreasure=false;
+    renderer.render(stage);
+
+    PIXI.loader.add(["treasureHunter.json"
+  ])
+  .load(setup);
+    function setup(){
+        gameScene=new PIXI.Container();
+        stage.addChild(gameScene);
+        gameOverScene=new PIXI.Container();
+        stage.addChild(gameOverScene);
+        gameOverScene.visible=false;
+        
+        id=PIXI.loader.resources["treasureHunter.json"].textures;
+        dungeon=new PIXI.Sprite(id["dungeon.png"]);
+        gameScene.addChild(dungeon);
+        door=new PIXI.Sprite(id["door.png"]);
+        door.position.set(32,0);
+        gameScene.addChild(door);
+        explorer=new PIXI.Sprite(id["explorer.png"]);
+        explorer.x=68;
+        explorer.y=gameScene.height/2-explorer.height/2;
+        explorer.vx=0;
+        explorer.vy=0;
+        gameScene.addChild(explorer);
+        treasure=new PIXI.Sprite(id["treasure.png"]);
+        treasure.x=gameScene.width-treasure.width-48;
+        treasure.y=gameScene.height/2-treasure.height/2;
+        gameScene.addChild(treasure);
+        
+        var spacing=50,xOffset=100,speed=1,direction=1;
+        for(var i=0;i<blobNum;i++){
+            var blob=new PIXI.Sprite(id["blob.png"]);
+            blob.x=i*spacing+xOffset;
+            blob.y=Math.random()*(stage.height-blob.height);
+            blob.vy=speed*direction;
+            direction*=-1;
+            blobs.push(blob);
+            gameScene.addChild(blob);
+        }
+        
+        lifeValueMessage=new PIXI.Text(lifeValue,{fontFamily: "Arial", fontSize: 32, fill: "white"});
+        gameScene.addChild(lifeValueMessage);
+        message=new PIXI.Text("The End!",{fontFamily: "Arial", fontSize: 32, fill: "white"});
+        message.x=120;
+        message.y=stage.height/2-32;
+        gameOverScene.addChild(message);
+        
+        var circle = new PIXI.Graphics();
+        circle.beginFill(0x9966FF);
+        circle.drawCircle(0, 0, 32);
+        circle.endFill();
+        circle.x = 300;
+        circle.y = 200;
+        //为circle添加点击事件
+        circle.interactive=true;
+        circle.buttonMode=true;
+        //点击刷新页面
+        circle.on("click",function(){location.reload();});
+        gameOverScene.addChild(circle);
+        
+        
+        renderer.render(stage);
+        
+        var left=keyboard(37),
+            up=keyboard(38),
+            right=keyboard(39),
+            down=keyboard(40);
+        left.press=function(){
+            explorer.vx=-5;
+            explorer.vy=0;
+        };
+        left.release=function(){
+            if(true){
+               explorer.vx=0;
+               }
+        };
+        up.press=function(){
+            explorer.vx=0;
+            explorer.vy=-5;
+        };
+        up.release=function(){
+            if(true){
+               explorer.vy=0;
+               }
+        };
+        right.press=function(){
+            explorer.vx=5;
+            explorer.vy=0;
+        };
+        right.release=function(){
+            if(true){
+               explorer.vx=0;
+               }
+        };
+        down.press=function(){
+            explorer.vx=0;
+            explorer.vy=5;
+        };
+        down.release=function(){
+            if(true){
+               explorer.vy=0;
+               }
+        };
+        
+        
+        explorer.vx=0;
+        explorer.vy=0;
+        gameLoop();
+    }
+    
+    var state=play;
+    function gameLoop(){
+        requestAnimationFrame(gameLoop);
+        state();
+        renderer.render(stage);
+    }
+    function play(){
+        explorer.x+=explorer.vx;
+        explorer.y+=explorer.vy;
+        contain(explorer,{x: 28, y: 10, width: 488, height: 480});
+        
+        blobs.forEach(function(blob){
+            blob.y+=blob.vy;
+            var blobHitWall=contain(blob,{x: 28, y: 10, width: 488, height: 480});
+            if(blobHitWall==="top"||blobHitWall==="bottom"){blob.vy*=-1;}
+            if(hitTestRectangle(explorer,blob)){
+                lifeValue-=1;
+                lifeValueMessage.text=lifeValue>=0?lifeValue:0;}
+            if(lifeValue<=0){gameScene.visible=false;gameOverScene.visible=true;}
+        });
+        
+        
+        if(hitTestRectangle(explorer,treasure)){
+            message.text="hit";
+            treasure.x=explorer.x+9;
+            treasure.y=explorer.y+5;
+            getTreasure=true;
+        }
+        if(hitTestRectangle(explorer,door)&&getTreasure){
+            message.text="You Win!";
+            gameScene.visible=false;
+            gameOverScene.visible=true;
+        }
+    }
+    
+    function contain(sprite,container){
+        var collision=undefined;
+        if(sprite.x<container.x){
+            sprite.x=container.x;
+            collision="left";
+        }
+        if(sprite.y<container.y){
+            sprite.y=container.y;
+            collision="top";
+        }
+        if(sprite.x+sprite.width>container.width){
+            sprite.x=container.width-sprite.width;
+            collision="right";
+        }
+        if(sprite.y+sprite.height>container.height){
+            sprite.y=container.height-sprite.height;
+            collision="bottom";
+        }
+        return collision;
+    }
+    
+    function keyboard(keycode){
+        var key={};
+        key.code=keycode;
+        key.isDown=false;
+        key.isUp=true;
+        key.press=undefined;
+        key.release=undefined;
+        
+        key.downHandler=function(event){
+            if(event.keyCode===key.code){
+                if(key.isUp&&key.press)key.press();
+                key.isDown=true;
+                key.isUp=false;
+            }
+            event.preventDefault();
+        };
+        key.upHandler=function(event){
+            if(event.keyCode===key.code){
+                if(key.isDown&&key.release)key.release();
+                key.isDown=false;
+                key.isUp=true;
+            }
+            event.preventDefault();
+        };
+        
+        window.addEventListener("keydown",key.downHandler.bind(key),false);
+        window.addEventListener("keyup",key.upHandler.bind(key),false);
+        return key;
+    }
+    
+    function hitTestRectangle(r1,r2){
+        var hit=false;
+        r1.centerX=r1.x+r1.width/2;
+        r1.centerY=r1.y+r1.height/2;
+        r2.centerX=r2.x+r2.width/2;
+        r2.centerY=r2.y+r2.height/2;
+        
+        var x=Math.abs(r1.centerX-r2.centerX);
+        var y=Math.abs(r1.centerY-r2.centerY);
+        
+        if((x<r1.width/2+r2.width/2)&&(y<r1.height/2+r2.height/2))
+            hit=true;
+        return hit;
+    }
+    
+</script>
+</body>
+</html>
